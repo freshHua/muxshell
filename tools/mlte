@@ -1,0 +1,154 @@
+#!/system/bin/sh
+
+IP="/system/bin/ip"
+IPTABLES="/system/bin/iptables"
+LINK_COUNT=0
+LTE0_MARK=100
+LTE1_MARK=101
+LTE2_MARK=102
+LTE3_MARK=103
+
+LTE0_IP=$(getprop net.eth0.ip)
+LTE0_GW=$(getprop net.eth0.gw)
+LTE0_SUBNETS=$(getprop net.eth0.subnets);
+
+if [ -n "$LTE0_IP" ];then
+	let LINK_COUNT++;
+fi
+
+LTE1_IP=$(getprop net.eth1.ip)
+LTE1_GW=$(getprop net.eth1.gw)
+LTE1_SUBNETS=$(getprop net.eth1.subnets);
+
+if [ -n "$LTE1_IP" ];then
+	let LINK_COUNT++;
+fi
+
+
+LTE2_IP=$(getprop net.eth2.ip)
+LTE2_GW=$(getprop net.eth2.gw)
+LTE2_SUBNETS=$(getprop net.eth2.subnets);
+
+if [ -n "$LTE2_IP" ];then
+	let LINK_COUNT++;
+fi
+
+LTE3_IP=$(getprop net.eth3.ip)
+LTE3_GW=$(getprop net.eth3.gw)
+LTE3_SUBNETS=$(getprop net.eth3.subnets);
+
+if [ -n "$LTE3_IP" ];then
+	let LINK_COUNT++;
+fi
+
+
+# 配置iptables
+$IPTABLES -t mangle -F
+packet_count=$LINK_COUNT
+
+#　配置端口
+if [ -n "$LTE0_IP" ];then
+      $IPTABLES -t mangle -A PREROUTING -i wlan0 -p udp --sport 8880:8888 -m state --state NEW  -j MARK --set-mark $LTE0_MARK
+      $IPTABLES -t mangle -A PREROUTING -i wlan0 -p tcp --sport 10001:10100 -m state --state NEW  -j MARK --set-mark $LTE0_MARK
+fi
+
+if [ -n "$LTE1_IP" ];then
+      $IPTABLES -t mangle -A PREROUTING -i wlan0 -p udp --sport 18880:18888 -m state --state NEW  -j MARK --set-mark $LTE1_MARK
+      $IPTABLES -t mangle -A PREROUTING -i wlan0 -p tcp --sport 20001:20100 -m state --state NEW  -j MARK --set-mark $LTE1_MARK
+fi
+
+if [ -n "$LTE2_IP" ];then
+      $IPTABLES -t mangle -A PREROUTING -i wlan0 -p udp --sport 28880:28888 -m state --state NEW  -j MARK --set-mark $LTE2_MARK
+      $IPTABLES -t mangle -A PREROUTING -i wlan0 -p tcp --sport 30001:30100 -m state --state NEW  -j MARK --set-mark $LTE2_MARK
+fi
+
+if [ -n "$LTE3_IP" ];then
+      $IPTABLES -t mangle -A PREROUTING -i wlan0 -p udp --sport 38880:38888 -m state --state NEW  -j MARK --set-mark $LTE3_MARK
+      $IPTABLES -t mangle -A PREROUTING -i wlan0 -p tcp --sport 40001:40100 -m state --state NEW  -j MARK --set-mark $LTE3_MARK
+fi
+
+if [ -n "$LTE0_IP" ];then
+   let packet_count--;
+#   $IPTABLES -t mangle -A PREROUTING  -i wlan0 -m conntrack --ctstate NEW -m statistic --mode nth --every $LINK_COUNT --packet $packet_count -j CONNMARK --set-mark $LTE0_MARK
+   $IPTABLES -t mangle -A PREROUTING -i wlan0 -m state --state NEW -m statistic --mode nth --every $LINK_COUNT --packet $packet_count -j MARK --set-mark $LTE0_MARK
+fi
+
+if [ -n "$LTE1_IP" ];then
+   let packet_count--;
+#   $IPTABLES -t mangle -A PREROUTING  -i wlan0 -m conntrack --ctstate NEW -m statistic --mode nth --every $LINK_COUNT --packet $packet_count -j CONNMARK --set-mark $LTE1_MARK
+   $IPTABLES -t mangle -A PREROUTING -i wlan0 -m state --state NEW -m statistic --mode nth --every $LINK_COUNT --packet $packet_count -j MARK --set-mark $LTE1_MARK
+fi
+
+if [ -n "$LTE2_IP" ];then
+   let packet_count--;
+#$IPTABLES -t mangle -A PREROUTING  -i wlan0 -m conntrack --ctstate NEW -m statistic --mode nth --every $LINK_COUNT --packet $packet_count -j CONNMARK --set-mark $LTE2_MARK
+   $IPTABLES -t mangle -A PREROUTING -i wlan0 -m state --state NEW -m statistic --mode nth --every $LINK_COUNT --packet $packet_count -j MARK --set-mark $LTE2_MARK
+fi
+
+if [ -n "$LTE3_IP" ];then
+   let packet_count--;
+#$IPTABLES -t mangle -A PREROUTING  -i wlan0 -m conntrack --ctstate NEW -m statistic --mode nth --every $LINK_COUNT --packet $packet_count -j CONNMARK --set-mark $LTE3_MARK
+   $IPTABLES -t mangle -A PREROUTING -i wlan0 -m state --state NEW -m statistic --mode nth --every $LINK_COUNT --packet $packet_count -j MARK --set-mark $LTE3_MARK
+fi
+
+$IPTABLES -t mangle -A PREROUTING -i wlan0 -m state --state NEW -j CONNMARK --save-mark
+$IPTABLES -t mangle -A PREROUTING -i wlan0 -j CONNMARK --restore-mark
+
+# router
+echo "@@@ Add route table @@@ \n"
+
+$IP route flush table LTE0
+if [ -n "$LTE0_GW" ];then
+#	$IPTABLES -t mangle -A PREROUTING -m connmark --mark $LTE0_MARK -j MARK --set-mark $LTE0_MARK
+	$IP route replace default via $LTE0_GW table LTE0
+	$IP route replace 192.168.43.0/24 dev wlan0 table LTE0
+	$IP route replace $LTE0_SUBNETS dev eth0 table LTE0
+	$IP route replace $LTE0_SUBNETS dev eth0 table LTE1
+	$IP route replace $LTE0_SUBNETS dev eth0 table LTE2
+	$IP route replace $LTE0_SUBNETS dev eth0 table LTE3
+	echo 1 > /sys/class/leds/led_3/brightness
+else
+	echo 0 > /sys/class/leds/led_3/brightness
+fi
+
+$IP route flush table LTE1
+if [ -n "$LTE1_GW" ];then
+#	$IPTABLES -t mangle -A PREROUTING -m connmark --mark $LTE1_MARK -j MARK --set-mark $LTE1_MARK
+	$IP route replace default via $LTE1_GW table LTE1
+	$IP route replace 192.168.43.0/24 dev wlan0 table LTE1
+	$IP route replace $LTE1_SUBNETS dev eth1 table LTE1
+	$IP route replace $LTE1_SUBNETS dev eth1 table LTE0
+	$IP route replace $LTE1_SUBNETS dev eth1 table LTE2
+	$IP route replace $LTE1_SUBNETS dev eth1 table LTE3
+	echo 1 > /sys/class/leds/led_8/brightness
+else
+	echo 0 > /sys/class/leds/led_8/brightness
+fi
+
+$IP route flush table LTE2
+if [ -n "$LTE2_GW" ];then
+#	$IPTABLES -t mangle -A PREROUTING -m connmark --mark $LTE2_MARK -j MARK --set-mark $LTE2_MARK
+	$IP route replace default via $LTE2_GW table LTE2
+	$IP route replace 192.168.43.0/24 dev wlan0 table LTE2
+	$IP route replace $LTE2_SUBNETS dev eth2 table LTE2
+	$IP route replace $LTE2_SUBNETS dev eth2 table LTE0
+	$IP route replace $LTE2_SUBNETS dev eth2 table LTE1
+	$IP route replace $LTE2_SUBNETS dev eth2 table LTE3
+	echo 1 > /sys/class/leds/led_9/brightness
+else
+	echo 0 > /sys/class/leds/led_9/brightness
+fi
+
+$IP route flush table LTE3
+if [ -n "$LTE3_GW" ];then
+#	$IPTABLES -t mangle -A PREROUTING -m connmark --mark $LTE3_MARK -j MARK --set-mark $LTE3_MARK
+	$IP route replace default via $LTE3_GW table LTE3
+	$IP route replace 192.168.43.0/24 dev wlan0 table LTE3
+	$IP route replace $LTE3_SUBNETS dev eth3 table LTE3
+	$IP route replace $LTE3_SUBNETS dev eth3 table LTE0
+	$IP route replace $LTE3_SUBNETS dev eth3 table LTE1
+	$IP route replace $LTE3_SUBNETS dev eth3 table LTE2
+	echo 1 > /sys/class/leds/led_7/brightness
+else
+	echo 0 > /sys/class/leds/led_7/brightness
+fi
