@@ -1,0 +1,38 @@
+需求一个文件中含有
+REGW 0xFF, 0x01        
+REGW 0x00, 0x01
+REGW 0x01, 0x55
+REGW 0x02, 0x40		            
+REGW 0x05, 0x50
+Regw 0x5A, 0x02      
+Regw 0x5B, 0x02      
+Regw 0x5C, 0x82      
+Regw 0x5D, 0x82      
+Regw 0x5E, 0x02      
+Regw 0x5F, 0x02
+REGW 0x72, 0x31
+REGW 0xFB, 0x01   
+需要转换
+REGW 0xFF, 0x01  -> {0xFF, 1, {0x01}}
+
+方法
+grep awk 提前
+grep  -E "Regw|REGW"  AUO_NT35596_NMOS_Type_B1_6K_20161014.MCR | awk -F"[ ,\t\r\n]+" '{ print "{" $2 ",1," "{" $3 "}" "}," }'
+
+需求一个文件包含
+static char NT35596H_FHD_video_on_cmd0[] = {0xFF, 0x01, 0x15, 0x80  };    
+static char NT35596H_FHD_video_on_cmd1[] = {0x00, 0x01, 0x15, 0x80  };    
+static char NT35596H_FHD_video_on_cmd2[] = {0x01, 0x55, 0x15, 0x80  }; 
+需要转换
+static char NT35596H_FHD_video_on_cmd0[] = {0xFF, 0x01, 0x15, 0x80  }; -> "FF 01 15 80\n"
+方法
+awk -F"[{,}\t\b]+" '{print $2 $3 $4 $5}' NT35596h.MCR |sed 's/[ \t]*$//g' | sed "s/0x//g" | sed 's/^/"&/g' | sed 's/$/&\\n"/g'
+sed 's/[ \t]*$//g' 删除末尾空格
+sed "s/0x//g" 删除0x
+sed 's/^/"&/g'　头增加内容 sed 's/^HEAD&/g'
+sed 's/$/&\\n"/g'　末尾增加内容 sed 's/$/&TAIL"/g'
+
+需求一个文件
+0x42,0x38,0x04,0x80,0x07,
+转换
+42 38 04 80 07 
